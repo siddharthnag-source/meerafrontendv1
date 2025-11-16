@@ -33,9 +33,8 @@ export class ApiError extends Error {
 export const chatService = {
   /**
    * TEMP: no backend history yet, so just return an empty list.
-   * This avoids hitting `localhost:8000` and breaking the UI.
    */
-  async getChatHistory(page: number = 1): Promise<ChatHistoryResponse> {
+  async getChatHistory(_page: number = 1): Promise<ChatHistoryResponse> {
     const emptyHistory = {
       message: 'ok',
       data: [],
@@ -73,7 +72,6 @@ export const chatService = {
 
       const body = (await response.json()) as { reply: string };
 
-      // One assistant message in the format used by the UI
       const assistantMessage: ChatMessageFromServer = {
         message_id: crypto.randomUUID(),
         content_type: 'assistant',
@@ -84,11 +82,9 @@ export const chatService = {
         failed: false,
       };
 
-      // Adapt to the ChatMessageResponse type that the UI uses
       const chatResponse = {
         message: 'ok',
         data: {
-          // Most UI code reads `data.response` as ChatMessageFromServer[]
           response: [assistantMessage],
         },
       } as unknown as ChatMessageResponse;
@@ -102,7 +98,5 @@ export const chatService = {
 };
 
 export const saveInteraction = (payload: SaveInteractionPayload) => {
-  // This still points to the old backend; it is only used for call sessions.
-  // If you don’t use calls yet, this will simply never be hit.
   return api.post(API_ENDPOINTS.CALL.SAVE_INTERACTION, payload);
 };
