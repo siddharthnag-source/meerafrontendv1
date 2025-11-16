@@ -2,6 +2,7 @@ import {
   ChatHistoryResponse,
   ChatMessageResponse,
   SaveInteractionPayload,
+  ChatMessageFromServer,
 } from '@/types/chat';
 import { api } from '../client';
 import { API_ENDPOINTS } from '../config';
@@ -42,9 +43,7 @@ export const chatService = {
   },
 
   // Simple, non-streaming sendMessage that talks to the Supabase Edge Function
-  async sendMessage(
-    formData: FormData,
-  ): Promise<ChatMessageResponse | Response> {
+  async sendMessage(formData: FormData): Promise<ChatMessageResponse> {
     const message = (formData.get('message') as string) || '';
 
     try {
@@ -68,7 +67,7 @@ export const chatService = {
       const body = await response.json(); // expected shape: { reply: string }
 
       // Adapt Supabase response into the shape the UI expects
-      const assistantMessage: any = {
+      const assistantMessage: ChatMessageFromServer = {
         message_id: crypto.randomUUID(),
         content_type: 'assistant',
         content: body.reply,
@@ -76,10 +75,10 @@ export const chatService = {
         attachments: [],
         is_call: false,
         failed: false,
+        // any extra fields in ChatMessageFromServer are optional
       };
 
       const chatResponse: ChatMessageResponse = {
-        // @ts-ignore – we’re matching the runtime shape the UI uses
         data: [assistantMessage],
       };
 
