@@ -32,21 +32,19 @@ export class ApiError extends Error {
 }
 
 export const chatService = {
-  // Stub: always return empty history so the UI can render
+  // Stub chat history so UI can render without backend history API
   async getChatHistory(page: number = 1): Promise<ChatHistoryResponse> {
-    // mark `page` as used so ESLint stays quiet
-    void page;
+    void page; // avoid unused-var lint
 
     const emptyHistory: ChatHistoryResponse = {
       message: 'ok',
-      // ChatHistoryResponse.data is ChatMessage[] – just return an empty array
       data: [],
     };
 
     return emptyHistory;
   },
 
-  // Non-streaming sendMessage that calls Supabase and adapts to ChatMessageResponse
+  // Non-streaming sendMessage that calls Supabase Edge Function
   async sendMessage(formData: FormData): Promise<ChatMessageResponse> {
     const message = (formData.get('message') as string) || '';
 
@@ -74,7 +72,7 @@ export const chatService = {
 
       const body = (await response.json()) as { reply: string };
 
-      // Shape exactly like ChatMessageFromServer
+      // Single assistant message in the format the UI expects
       const assistantMessage: ChatMessageFromServer = {
         message_id: crypto.randomUUID(),
         content_type: 'assistant',
@@ -85,14 +83,13 @@ export const chatService = {
         failed: false,
       };
 
-      // Shape exactly like ChatMessageResponse
-      // (ChatMessageResponseData has `response` and `messages`)
+      // Adapt to ChatMessageResponse shape: { message: 'ok', data: { response, message } }
       const chatResponse: ChatMessageResponse = {
         message: 'ok',
         data: {
           response: body.reply,
-          messages: [assistantMessage],
-        },
+          message: assistantMessage,
+        } as ChatMessageResponse['data'],
       };
 
       return chatResponse;
