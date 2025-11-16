@@ -26,10 +26,11 @@ export class ApiError extends Error {
   }
 }
 
-// ---------- Helpers ----------
-
-function buildAssistantResponse(text: string): ChatMessageResponse {
-  const assistantMessage: ChatMessageFromServer = {
+/**
+ * Build a single assistant message from plain text
+ */
+function buildAssistantMessage(text: string): ChatMessageFromServer {
+  return {
     message_id: crypto.randomUUID(),
     content_type: 'assistant',
     content: text,
@@ -38,14 +39,18 @@ function buildAssistantResponse(text: string): ChatMessageResponse {
     is_call: false,
     failed: false,
   };
+}
+
+/**
+ * Build a ChatMessageResponse in the shape the UI expects:
+ *   { message: 'ok', data: ChatMessageFromServer[] }
+ */
+function buildAssistantResponse(text: string): ChatMessageResponse {
+  const assistantMessage = buildAssistantMessage(text);
 
   const chatResponse: ChatMessageResponse = {
     message: 'ok',
-    data: {
-      // IMPORTANT: shape must match ChatMessageResponse['data']
-      response: text,
-      message: assistantMessage,
-    } as ChatMessageResponse['data'],
+    data: [assistantMessage], // <-- IMPORTANT: data is an ARRAY
   };
 
   return chatResponse;
@@ -70,6 +75,8 @@ export const chatService = {
   async sendMessage(formData: FormData): Promise<ChatMessageResponse> {
     const message = (formData.get('message') as string) || '';
 
+    console.log('[chatService.sendMessage] stub called with:', message);
+
     // Small artificial delay so it feels real
     await new Promise((resolve) => setTimeout(resolve, 300));
 
@@ -77,10 +84,18 @@ export const chatService = {
       ? `Meera (local): I heard "${message}"`
       : 'Meera (local): I heard an empty message.';
 
-    return buildAssistantResponse(replyText);
+    const response = buildAssistantResponse(replyText);
+
+    console.log('[chatService.sendMessage] returning:', response);
+    return response;
   },
 };
 
+/**
+ * TEMP stub: don't try to hit the old backend.
+ * We keep the signature compatible (it still returns a Promise).
+ */
 export const saveInteraction = (payload: SaveInteractionPayload) => {
-  return api.post(API_ENDPOINTS.CALL.SAVE_INTERACTION, payload);
+  console.log('[saveInteraction] stubbed – not sending to backend', payload);
+  return Promise.resolve({} as any);
 };
