@@ -2,6 +2,7 @@ import {
   ChatHistoryResponse,
   ChatMessageResponse,
   SaveInteractionPayload,
+  ChatMessageFromServer,
 } from '@/types/chat';
 import { api } from '../client';
 import { API_ENDPOINTS } from '../config';
@@ -19,13 +20,9 @@ export class SessionExpiredError extends Error {
 
 export class ApiError extends Error {
   status: number;
-  body: { detail?: string; error?: string };
+  body: { detail?: string };
 
-  constructor(
-    message: string,
-    status: number,
-    body: { detail?: string; error?: string },
-  ) {
+  constructor(message: string, status: number, body: { detail?: string }) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
@@ -34,19 +31,30 @@ export class ApiError extends Error {
 }
 
 export const chatService = {
+  /**
+   * TEMP: no real backend history yet, so just return an empty list.
+   */
   async getChatHistory(page: number = 1): Promise<ChatHistoryResponse> {
-    try {
-      return await api.get<ChatHistoryResponse>(
-        `${API_ENDPOINTS.CHAT.HISTORY}?page=${page}`,
-      );
-    } catch (error) {
-      console.error('Error in getChatHistory:', error);
-      throw error;
-    }
+    // “Use” the argument so ESLint is happy (we ignore it for now).
+    void page;
+
+    const emptyHistory = {
+      message: 'ok',
+      data: {
+        response: [] as ChatMessageFromServer[],
+      },
+    } as unknown as ChatHistoryResponse;
+
+    return emptyHistory;
   },
 
-  // Non-streaming sendMessage that talks to the Supabase Edge Function
-  async sendMessage(formData: FormData): Promise<ChatMessageResponse> {
+  /**
+   * Non-streaming sendMessage that calls the Supabase Edge Function
+   * and adapts the reply into the shape the UI expects.
+   */
+  async sendMessage(
+    formData: FormData,
+  ): Promise<ChatMessageResponse | Response> {
     const message = (formData.get('message') as string) || '';
 
     try {
@@ -59,35 +67,32 @@ export const chatService = {
       });
 
       if (!response.ok) {
-        const errorBody = await response.json().catch(() => ({}));
+        const errorBody = await response.json().catch(() => ({ error: '' }));
         throw new ApiError(
-          (errorBody.error ||
-            errorBody.detail ||
-            'Failed to get reply from Meera') as string,
+          errorBody.error || 'Failed to get reply from Meera',
           response.status,
           errorBody,
         );
       }
 
-      const body = await response.json(); // expected: { reply: string }
+      const body = (await response.json()) as { reply: string };
 
-      // Shape exactly as the old backend response so UI is happy
-      const assistantMessage = {
+      const assistantMessage: ChatMessageFromServer = {
         message_id: crypto.randomUUID(),
         content_type: 'assistant',
         content: body.reply,
         timestamp: new Date().toISOString(),
-        attachments: [] as unknown[],
+        attachments: [],
         is_call: false,
         failed: false,
       };
 
-      const chatResponse: ChatMessageResponse = {
-        message: 'success',
+      const chatResponse = {
+        message: 'ok',
         data: {
           response: [assistantMessage],
         },
-      };
+      } as unknown as ChatMessageResponse;
 
       return chatResponse;
     } catch (error) {
