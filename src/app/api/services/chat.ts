@@ -32,19 +32,15 @@ export class ApiError extends Error {
 }
 
 export const chatService = {
-  // Temporary stub: always return empty history so UI can render
+  // Stub: always return empty history so the UI can render
   async getChatHistory(page: number = 1): Promise<ChatHistoryResponse> {
     // mark `page` as used so ESLint stays quiet
     void page;
 
     const emptyHistory: ChatHistoryResponse = {
       message: 'ok',
-      // your UI expects data.messages; return empty array
-      // and any other optional fields can be left out
-      data: {
-        response: '',
-        messages: [],
-      },
+      // ChatHistoryResponse.data is ChatMessage[] – just return an empty array
+      data: [],
     };
 
     return emptyHistory;
@@ -90,6 +86,7 @@ export const chatService = {
       };
 
       // Shape exactly like ChatMessageResponse
+      // (ChatMessageResponseData has `response` and `messages`)
       const chatResponse: ChatMessageResponse = {
         message: 'ok',
         data: {
