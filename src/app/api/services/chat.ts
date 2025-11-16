@@ -4,8 +4,6 @@ import {
   ChatMessageResponse,
   SaveInteractionPayload,
 } from '@/types/chat';
-import { api } from '../client';
-import { API_ENDPOINTS } from '../config';
 
 export class SessionExpiredError extends Error {
   constructor(message: string) {
@@ -50,7 +48,7 @@ function buildAssistantResponse(text: string): ChatMessageResponse {
 
   const chatResponse: ChatMessageResponse = {
     message: 'ok',
-    data: [assistantMessage], // <-- IMPORTANT: data is an ARRAY
+    data: [assistantMessage],
   };
 
   return chatResponse;
@@ -92,10 +90,12 @@ export const chatService = {
 };
 
 /**
- * TEMP stub: don't try to hit the old backend.
- * We keep the signature compatible (it still returns a Promise).
+ * TEMP stub: do nothing, keep signature compatible.
  */
-export const saveInteraction = (payload: SaveInteractionPayload) => {
-  console.log('[saveInteraction] stubbed – not sending to backend', payload);
-  return Promise.resolve({} as any);
+export const saveInteraction = async (
+  payload: SaveInteractionPayload,
+): Promise<void> => {
+  // avoid unused-var lint
+  void payload;
+  // no backend call for now
 };
