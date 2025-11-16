@@ -1,5 +1,3 @@
-// src/app/api/services/chat.ts
-
 import {
   ChatHistoryResponse,
   ChatMessageFromServer,
@@ -33,10 +31,34 @@ export class ApiError extends Error {
   }
 }
 
+// Small helper to build a ChatMessageResponse in the exact shape the UI expects
+function buildAssistantResponse(text: string): ChatMessageResponse {
+  const assistantMessage: ChatMessageFromServer = {
+    message_id: crypto.randomUUID(),
+    content_type: 'assistant',
+    content: text,
+    timestamp: new Date().toISOString(),
+    attachments: [],
+    is_call: false,
+    failed: false,
+  };
+
+  const chatResponse: ChatMessageResponse = {
+    message: 'ok',
+    data: {
+      // `response` + single `message` object; matches ChatMessageResponseData
+      response: text,
+      message: assistantMessage,
+    } as ChatMessageResponse['data'],
+  };
+
+  return chatResponse;
+}
+
 export const chatService = {
-  // Simple stub so the UI can render an empty conversation
+  // Stub chat history so UI can render without backend history API
   async getChatHistory(page: number = 1): Promise<ChatHistoryResponse> {
-    void page; // avoid unused var lint
+    void page; // avoid unused-var lint
 
     const emptyHistory: ChatHistoryResponse = {
       message: 'ok',
@@ -48,21 +70,11 @@ export const chatService = {
 
   // Non-streaming sendMessage that calls Supabase Edge Function
   async sendMessage(formData: FormData): Promise<ChatMessageResponse> {
-    // Try to read the message from the form in a tolerant way
-    const raw =
-      formData.get('message') ??
-      formData.get('content') ??
-      formData.get('text');
+    const message = (formData.get('message') as string) || '';
 
-    const message = typeof raw === 'string' ? raw : '';
-
-    if (!message) {
-      // Frontend should never send an empty message; if it does we fail fast
-      throw new Error('No message content provided');
-    }
-
-    if (!SUPABASE_CHAT_URL) {
-      throw new Error('Supabase chat URL is not configured');
+    // If somehow we don't have a message, still reply gracefully
+    if (!message.trim()) {
+      return buildAssistantResponse('Meera heard an empty message.');
     }
 
     try {
@@ -75,48 +87,33 @@ export const chatService = {
       });
 
       if (!response.ok) {
+        // Try to read error body, but never throw up to the UI
         const errorBody = (await response.json().catch(() => ({}))) as {
           error?: string;
           detail?: string;
         };
 
-        throw new ApiError(
-          errorBody.error || errorBody.detail || 'Failed to get reply from Meera',
-          response.status,
-          errorBody,
-        );
+        console.error('Supabase chat error:', response.status, errorBody);
+
+        const text =
+          errorBody.error ||
+          errorBody.detail ||
+          'Meera could not reach the backend right now. Please try again.';
+
+        return buildAssistantResponse(text);
       }
 
-      // We expect the Supabase function to return: { reply: "Meera heard: hi" }
       const body = (await response.json().catch(() => ({}))) as { reply?: string };
 
-      const replyText = body.reply ?? '';
-
-      const assistantMessage: ChatMessageFromServer = {
-        message_id:
-          (typeof crypto !== 'undefined' && 'randomUUID' in crypto
-            ? crypto.randomUUID()
-            : Math.random().toString(36).slice(2)),
-        content_type: 'assistant',
-        content: replyText,
-        timestamp: new Date().toISOString(),
-        attachments: [],
-        is_call: false,
-        failed: false,
-      };
-
-      const chatResponse: ChatMessageResponse = {
-        message: 'ok',
-        data: {
-          response: replyText,
-          message: assistantMessage,
-        } as ChatMessageResponse['data'],
-      };
-
-      return chatResponse;
+      const replyText = body.reply || 'Meera heard you, but the reply was empty.';
+      return buildAssistantResponse(replyText);
     } catch (error) {
-      console.error('Error in sendMessage:', error);
-      throw error;
+      console.error('Error in sendMessage (network / CORS / unknown):', error);
+
+      // Final safety net: never throw, always return a graceful message
+      return buildAssistantResponse(
+        'Meera ran into a technical issue while replying. Please try again in a moment.',
+      );
     }
   },
 };
